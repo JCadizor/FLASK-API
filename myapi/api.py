@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api, Resource, reqparse, abort
 import os
 from datetime import datetime, date, time
+from functools import wraps
 
 app = Flask(__name__)
 # construir caminho absoluto para o ficheiro de BD dentro de `myapi/instance`
@@ -12,8 +13,23 @@ os.makedirs(INSTANCE_DIR, exist_ok=True)
 DB_PATH = os.path.join(INSTANCE_DIR, 'myapi.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configuração de autenticação
+API_KEY = os.environ.get('API_KEY', 'desenvolvimento_key_123')  # chave padrão para dev local
+
 db = SQLAlchemy(app)
 api = Api(app)
+
+
+def require_api_key(f):
+    """Decorator para verificar API key"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-KEY')
+        if not api_key or api_key != API_KEY:
+            abort(401, message='API key inválida ou ausente. Use header X-API-KEY.')
+        return f(*args, **kwargs)
+    return decorated_function
 
 class UserModule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -84,6 +100,7 @@ def parse_time(s):
 
 
 class AttendanceListResource(Resource):
+    @require_api_key
     def get(self):
         name = request.args.get('name')
         date_str = request.args.get('date')
@@ -98,6 +115,7 @@ class AttendanceListResource(Resource):
         results = query.all()
         return [r.to_dict() for r in results]
 
+    @require_api_key
     def post(self):
         data = request.get_json(force=True)
         if not data:
@@ -119,6 +137,7 @@ class AttendanceListResource(Resource):
 
 
 class AttendanceResource(Resource):
+    @require_api_key
     def get(self, id):
         rec = Attendance.query.get(id)
         if not rec:
@@ -127,6 +146,7 @@ class AttendanceResource(Resource):
 
 
 class AttendanceHistoryResource(Resource):
+    @require_api_key
     def get(self):
         name = request.args.get('name')
         limit = request.args.get('limit', type=int) or 10
@@ -142,7 +162,23 @@ api.add_resource(AttendanceHistoryResource, '/attendance/history')
 
 @app.route('/')
 def home():
-    return jsonify({'message': 'Welcome to my API!'})
+    return jsonify({
+        'message': 'Welcome to my API!', 
+        'status': 'online',
+        'authentication': 'required',
+        'header_required': 'X-API-KEY'
+    })
+
+
+@app.route('/auth-info')
+def auth_info():
+    return jsonify({
+        'authentication_method': 'API Key',
+        'header_name': 'X-API-KEY',
+        'example_usage': 'curl -H "X-API-KEY: your_key_here" https://api-url/attendance',
+        'endpoints_requiring_auth': ['/attendance', '/attendance/{id}', '/attendance/history'],
+        'public_endpoints': ['/', '/auth-info']
+    })
 
 
 

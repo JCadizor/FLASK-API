@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+a#!/usr/bin/env python
 """
 Script de teste para a API de assiduidade.
 Executa a API e testa os endpoints principais.

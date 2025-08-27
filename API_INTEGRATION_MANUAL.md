@@ -353,7 +353,7 @@ async def process_voice_query(audio_input):
 ## Contacto e Suporte
 
 **Projeto:** Engenharia Eletrotécnica e de Computadores - ISEP  
-**Autor:** [Nome do Autor]  
+**Autor:** José Cádiz 
 **Repositório:** https://github.com/JCadizor/FLASK-API  
 **Data de Criação:** Agosto 2025  
 

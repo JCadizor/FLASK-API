@@ -142,7 +142,8 @@ def generate_september_data():
                 pattern["exit_variance"]
             )
             
-            # Registo principal (entrada e saída do dia)
+            # Registos para o dia (conforme especificação da API)
+            # Cada colaborador terá um registo principal com entrada e saída
             main_record = {
                 "name": emp_name,
                 "date": date_str,
@@ -152,7 +153,7 @@ def generate_september_data():
             }
             records.append(main_record)
             
-            # Registos de almoço (se aplicável)
+            # Registos de almoço (se aplicável) - registos separados para entrada/saída do almoço
             should_lunch = random.random() < pattern["lunch_frequency"]
             
             # Clara só sai às sextas
@@ -179,7 +180,6 @@ def generate_september_data():
                     "name": emp_name,
                     "date": date_str,
                     "location": pattern["location"],
-                    "time_entry": None,
                     "time_exit": lunch_out_time
                 }
                 records.append(lunch_out_record)
@@ -189,8 +189,7 @@ def generate_september_data():
                     "name": emp_name,
                     "date": date_str,
                     "location": pattern["location"],
-                    "time_entry": lunch_in_time,
-                    "time_exit": None
+                    "time_entry": lunch_in_time
                 }
                 records.append(lunch_in_record)
     
@@ -226,7 +225,10 @@ def insert_records_batch(records, batch_size=10):
                 
                 if response.status_code == 201:
                     success_count += 1
-                    print(f"  ✅ {record['name']} - {record['date']} - {record.get('time_entry', 'saída')} - OK")
+                    response_data = response.json()
+                    entry_info = record.get('time_entry', 'N/A')
+                    exit_info = record.get('time_exit', 'N/A')
+                    print(f"  ✅ {record['name']} - {record['date']} - Entrada: {entry_info} - Saída: {exit_info} - ID: {response_data.get('id', 'N/A')}")
                 else:
                     error_count += 1
                     print(f"  ❌ {record['name']} - {record['date']} - Erro {response.status_code}: {response.text[:100]}")

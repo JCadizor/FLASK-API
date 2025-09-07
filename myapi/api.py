@@ -202,6 +202,116 @@ def init_db(seed=True):
             db.session.commit()
 
 
+@app.route('/admin/health-check', methods=['GET'])
+@require_api_key
+def health_check():
+    """Endpoint para verificar o estado da base de dados e repopular se necessário"""
+    try:
+        attendances = Attendance.query.all()
+        record_count = len(attendances)
+        
+        response_data = {
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "database_status": "healthy" if record_count >= 50 else "needs_repopulation",
+            "record_count": record_count,
+            "message": f"Base de dados com {record_count} registos"
+        }
+        
+        # Se há poucos registos, sugerir repopulação
+        if record_count < 50:
+            response_data["suggestion"] = "Consider running auto_repopulate.py script"
+            response_data["repopulation_needed"] = True
+        else:
+            response_data["repopulation_needed"] = False
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Database health check failed",
+            "details": str(e),
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }), 500
+
+
+@app.route('/admin/repopulate', methods=['POST'])
+@require_api_key
+def trigger_repopulation():
+    """Endpoint para disparar a repopulação da base de dados"""
+    try:
+        # Verificar estado atual
+        current_count = len(Attendance.query.all())
+        
+        # Se já tem muitos dados, avisar
+        if current_count > 100:
+            return jsonify({
+                "warning": "Database already has many records",
+                "current_count": current_count,
+                "message": "Use with caution to avoid duplicates",
+                "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }), 200
+        
+        # Importar dados de exemplo diretamente aqui
+        from datetime import datetime, timedelta
+        import random
+        
+        # Lista de funcionários fictícios
+        employees = [
+            "Ana Silva", "Bruno Costa", "Carlos Mendes", "Diana Santos", "Eduardo Lima",
+            "Fernanda Oliveira", "Gabriel Pereira", "Helena Rodrigues", "Igor Ferreira", 
+            "Joana Martins", "Kevin Almeida", "Laura Sousa", "Miguel Torres", "Natália Cruz",
+            "Pedro Carvalho", "Sofia Ribeiro", "Tiago Gomes", "Vera Cardoso", "William Dias"
+        ]
+        
+        locations = ["Escritório Principal", "Laboratório", "Oficina", "Sala de Reuniões", "Campo"]
+        
+        # Gerar registos para os últimos 30 dias
+        records_added = 0
+        start_date = datetime.now() - timedelta(days=30)
+        
+        for day_offset in range(30):
+            current_date = start_date + timedelta(days=day_offset)
+            
+            # Simular presença de 60-80% dos funcionários por dia
+            present_employees = random.sample(employees, random.randint(12, 16))
+            
+            for employee in present_employees:
+                # Horários realistas
+                entry_hour = random.randint(7, 9)
+                entry_minute = random.randint(0, 59)
+                exit_hour = random.randint(16, 18)
+                exit_minute = random.randint(0, 59)
+                
+                new_attendance = Attendance(
+                    name=employee,
+                    date=current_date.strftime('%Y-%m-%d'),
+                    location=random.choice(locations),
+                    time_entry=f"{entry_hour:02d}:{entry_minute:02d}",
+                    time_exit=f"{exit_hour:02d}:{exit_minute:02d}"
+                )
+                
+                db.session.add(new_attendance)
+                records_added += 1
+        
+        # Commit todas as mudanças
+        db.session.commit()
+        
+        return jsonify({
+            "success": "Database repopulated successfully",
+            "records_added": records_added,
+            "total_records": len(Attendance.query.all()),
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to repopulate database",
+            "details": str(e),
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }), 500
+
+
 if __name__ == '__main__':
     # inicializa DB e inicia a app
     with app.app_context():
